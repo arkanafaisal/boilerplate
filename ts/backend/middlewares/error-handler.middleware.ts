@@ -1,7 +1,7 @@
 import { logger } from "../libs/logger.lib.js"
 
 export function errorHandler(err, req, res, next){
-    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    if (err instanceof SyntaxError && 'body' in err) {
         res.status(400).json({error: "invalid JSON format"})
         return
     }
