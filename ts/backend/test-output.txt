@@ -1,0 +1,65 @@
+=== USERNAME TESTS ===
+[Missing Username]
+Input: {"password":"password123"}
+Output: ❌ Username must be a valid string.
+---
+[Invalid Type Username]
+Input: {"username":123,"password":"password123"}
+Output: ❌ Username must be a valid string.
+---
+[Too Long Username]
+Input: {"username":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","password":"password123"}
+Output: ❌ Username cannot exceed 30 in value.
+---
+[Regex Fail Username]
+Input: {"username":"invalid_user!","password":"password123"}
+Output: ❌ Invalid string: must match pattern /^[a-zA-Z0-9]+$/
+---
+=== EMAIL TESTS ===
+[Missing Email]
+Input: {}
+Output: ❌ Email must be a valid string.
+---
+[Invalid Format Email]
+Input: {"email":"notanemail"}
+Output: ❌ Invalid email address
+---
+[Too Long Email]
+Input: {"email":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com"}
+Output: ❌ Email cannot exceed 255 in value.
+---
+=== PASSWORD TESTS ===
+[Missing Password]
+Input: {"username":"validUser"}
+Output: ❌ Password must be a valid string.
+---
+[Too Short Password]
+Input: {"username":"validUser","password":"123"}
+Output: ❌ Password must be at least 6 in value.
+---
+[Too Long Password]
+Input: {"username":"validUser","password":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+Output: ❌ Password cannot exceed 255 in value.
+---
+=== TOKEN TESTS ===
+[Missing Token]
+Input: {}
+Output: ❌ Token must be a valid string.
+---
+[Wrong Length Token]
+Input: {"token":"aaaaaaaaaa"}
+Output: ❌ Token must be at least 64 in value.
+---
+[Regex Fail Token]
+Input: {"token":"gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"}
+Output: ❌ Invalid string: must match pattern /^[0-9a-fA-F]+$/
+---
+=== UNION TESTS (Login Identifier) ===
+[Missing Identifier]
+Input: {"password":"password123"}
+Output: ❌ Invalid input
+---
+[Invalid Identifier (Not email, not valid username)]
+Input: {"identifier":"not_an_email_and_has_special!","password":"password123"}
+Output: ❌ Invalid input
+---

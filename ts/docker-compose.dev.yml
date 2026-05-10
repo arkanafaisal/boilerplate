@@ -1,0 +1,24 @@
+name: ${PROJECT_NAME}
+
+services:
+  app:
+    build:
+      context: .
+      target: app
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    ports:
+      - "${PORT}:${PORT}"
+    env_file:
+      - .env
+
+  flyway:
+    build:
+      context: .
+      target: flyway
+    environment:
+      FLYWAY_URL: jdbc:mysql://${MYSQL_HOST}:3306/${MYSQL_DB}
+      FLYWAY_USER: ${MYSQL_USER}
+      FLYWAY_PASSWORD: ${MYSQL_PASSWORD}
+      FLYWAY_VALIDATE_MIGRATION_NAMING: "true"
+    command: migrate
