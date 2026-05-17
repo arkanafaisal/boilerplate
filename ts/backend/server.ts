@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-// import 'dotenv/config'
 import { logger } from './libs/logger.lib.js'
 import { env, isDev, port, projectName } from './configs/env.config.js';
 
@@ -15,7 +14,7 @@ app.use(cookieParser())
 app.use(cors({
   origin: isDev? ['http://127.0.0.1:5173', 'http://localhost:5173'] : `https://${projectName}.arkanafaisal.my.id`,
   credentials: true,
-  allowedHeaders: ['Content-Type', 'accessToken'],   // opsional, header yg diizinkan
+  allowedHeaders: ['Content-Type', 'Authorization'],
   preflightContinue: false,
   optionsSuccessStatus: 204
 }))
@@ -37,21 +36,25 @@ app.use((req, res, next) => {
 
 
 
-import db from './libs/db.lib.js';
+import { Request, Response } from 'express';
+import { prisma } from './libs/prisma.lib.js';
 import redis from './libs/redis.lib.js';
 import { rl } from './middlewares/rate-limiter.middleware.js';
 
-app.get('/health', rl, async (req, res)=>{
+app.get('/health', rl('health'), async (req: Request, res: Response)=>{
   const now = Date.now()
   let payload = {
     status: 'ok',
     uptime: now - serverStartTime,
     timestamp: now,
     environment: env,
-    services: {}
+    services: {
+      redis: 'unknown',
+      db: 'unknown'
+    }
   }
   try {
-    await withTimeout(db.query('SELECT 1'), 500)
+    await withTimeout(prisma.$queryRaw`SELECT 1`, 500)
     payload.services.db = 'ok'
   } catch (error) {
     payload.services.db = 'fail'
@@ -69,7 +72,9 @@ app.get('/health', rl, async (req, res)=>{
   return res.json(payload)
 })
 
-function withTimeout(promise, ms) {
+function withTimeout(promise: Promise<any>, ms: number) {
+  promise.catch(() => {});
+
   return Promise.race([
     promise,
     new Promise((_, reject) =>
@@ -102,11 +107,11 @@ import { fileURLToPath } from "url"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename);
 
-app.use(express.static(path.join(__dirname, "dist")));
+app.use(express.static(path.join(__dirname, "../public")));
 
 app.use((req, res, next) => {
   if (req.path.startsWith('/api')) return next();
-  res.sendFile(path.join(__dirname, "dist", "index.html"));
+  res.sendFile(path.join(__dirname, "../public/index.html"));
 });
 
 
@@ -131,7 +136,7 @@ async function shutdown() {
 
   server.close();
 
-  await db.end();
+  await prisma.$disconnect()
   await redis.quit();
 
   logger.info('server closed');

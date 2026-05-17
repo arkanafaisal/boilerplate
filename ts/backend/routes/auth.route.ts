@@ -8,12 +8,12 @@ import { authController } from '../controllers/auth.controller.js';
 
 export const authRouter = express.Router();
 
-authRouter.post('/register',                rl,   validate('register'),        authController.register);
-authRouter.post('/login',                   rl,   validate('login'),           authController.login);
-authRouter.post('/logout',                  rl,                                authController.logout)
-authRouter.post('/refresh',                 rl,                                authController.refresh);
+authRouter.post('/register',                rl('register'),   validate('register'),        authController.register);
+authRouter.post('/login',                   rl('login'),   validate('login'),           authController.login);
+authRouter.post('/logout',                  rl('logout'),                                authController.logout)
+authRouter.post('/refresh',                 rl('refresh'),                                authController.refresh);
 
 
-authRouter.post('/verify-email/:token',     rl,   validate('verifyEmail'),     authController.verifyEmail)
-authRouter.post("/forgot-password",         rl,   validate('forgotPassword'),  authController.forgotPassword)
-authRouter.post("/reset-password/:token",   rl,   validate('resetPassword'),   authController.resetPassword)
+authRouter.post('/verify-email/:token',     rl('verifyEmail'),   validate('verifyEmail'),     authController.verifyEmail)
+authRouter.post("/forgot-password",         rl('sendResetPasswordLink'),   validate('forgotPassword'),  authController.forgotPassword)
+authRouter.post("/reset-password/:token",   rl('verifyResetPassword'),   validate('resetPassword'),   authController.resetPassword)

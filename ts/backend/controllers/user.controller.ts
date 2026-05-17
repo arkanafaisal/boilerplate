@@ -1,48 +1,37 @@
-import asyncHandler from "express-async-handler"
 import { randomBytes, createHash } from 'crypto'
 import bcrypt from 'bcrypt'
 
-import { user as UserModel } from "../models/user.model.js"
+import { userModel } from "../models/user.model.js"
 import { sendMail } from "../utils/mailer.util.js"
 
 import * as redisHelper from '../helpers/redis.helper.js'
 import { logger } from "../libs/logger.lib.js"
+import { authTypedHandler } from "../utils/handler.util.js"
 
-
+import { userSchema } from "../schemas/user.schema.js"
+ 
 export const userController = {
 
-    getMe: asyncHandler(async (req, res) => {
-        const { ok, data } = await redisHelper.get('profile', req.user.id)
-        if (ok) {
-            res.json(data)
-            return
-        }
-        const user = await UserModel.getById({ id: req.user.id })
-        if (!user) {
-            res.sendStatus(401)
-            return
-        }
-        await redisHelper.set('profile', req.user.id, user)
+    getMe: authTypedHandler<{}>(async (req, res) => {
+        const cachePayload = await redisHelper.get('profile', String(req.user.id))
+        if (cachePayload.ok) { res.json(cachePayload.data); return }
+
+        const user = await userModel.getById({ id: req.user.id })
+        if (!user) { res.sendStatus(401); return }
+
+        await redisHelper.set('profile', String(req.user.id), user)
         res.json(user)
         return
     }),
 
 
-    updateUsername: asyncHandler(async (req, res) => {
+    updateUsername: authTypedHandler<typeof userSchema.updateUsername>(async (req, res) => {
         const { username } = req.validated.body
 
-        const { affectedRows, changedRows } = await UserModel.updateUsername({ username, id: req.user.id })
-        if (affectedRows === 0) {
-            res.sendStatus(401)
-            return
-        }
-        if (changedRows === 0) {
-            logger.info({ userId: req.user.id, username }, 'update username success')
-            res.sendStatus(200)
-            return
-        }
+        const success = await userModel.updateUsername({ id: req.user.id, username })
+        if(!success){res.sendStatus(404); return}
 
-        await redisHelper.invalidate('profile', req.user.id)
+        await redisHelper.invalidate('profile', String(req.user.id))
 
 
         logger.info({ userId: req.user.id, username }, 'update username success')
@@ -50,48 +39,34 @@ export const userController = {
         return
     }),
 
-    updatePassword: asyncHandler(async (req, res) => {
+    updatePassword: authTypedHandler<typeof userSchema.updatePassword>(async (req, res) => {
         const { oldPassword, newPassword } = req.validated.body
 
-        const user = await UserModel.getPasswordById({ id: req.user.id })
-        if (!user) {
-            res.sendStatus(401)
-            return
-        }
-        const match = await bcrypt.compare(oldPassword, user.password)
-        if (!match) {
-            res.status(400).json({ error: "wrong password" })
-            return
-        }
-        const hashed = await bcrypt.hash(newPassword, 10)
-        const affectedRows = await UserModel.updatePassword({ password: hashed, id: req.user.id })
-        if (affectedRows === 0) {
-            res.sendStatus(401)
-            return
-        }
+        const password = await userModel.getPasswordById({ id: req.user.id })
+        if (!password) { res.sendStatus(401); return }
+
+        const match = await bcrypt.compare(oldPassword, password)
+        if (!match) { res.status(400).json({ error: "wrong password" }); return }
+
+        const success = await userModel.updatePassword({ id: req.user.id, password: newPassword })
+        if(!success){res.sendStatus(404); return}
+
         logger.info({ userId: req.user.id }, 'update password success')
         res.sendStatus(200)
         return
     }),
 
 
-    sendEmailVerification: asyncHandler(async (req, res) => {
+    sendEmailVerification: authTypedHandler<typeof userSchema.sendEmailVerification>(async (req, res) => {
         const { email } = req.validated.body
 
-        const isExist = await UserModel.validateEmail({ email })
-        if (isExist) {
-            res.sendStatus(409)
-            return
-        }
-        const user = await UserModel.getById({ id: req.user.id })
-        if (!user) {
-            res.sendStatus(401)
-            return
-        }
-        if (user.email === email) {
-            res.status(400).json({ error: 'No change in email' })
-            return
-        }
+        const isExist = await userModel.validateEmail({ email })
+        if (isExist) { res.sendStatus(409); return }
+
+        const user = await userModel.getById({ id: req.user.id })
+        if (!user) { res.sendStatus(401); return }
+        if (user.email === email) { res.status(400).json({ error: 'No change in email' }); return }
+        
         const token = randomBytes(32).toString('hex')
         const tokenHash = createHash('sha256').update(token).digest('hex')
 
@@ -111,15 +86,13 @@ export const userController = {
     }),
 
 
-    delete: asyncHandler(async (req, res) => {
+    delete: authTypedHandler<typeof userSchema.delete>(async (req, res) => {
         const { username } = req.validated.body
 
-        const affectedRows = await UserModel.del({ id: req.user.id, username })
-        if (!affectedRows) {
-            res.sendStatus(400)
-            return
-        }
-        await redisHelper.invalidate('profile', req.user.id)
+        const success = await userModel.del({ id: req.user.id, username })
+        if(!success){res.sendStatus(404); return}
+        
+        await redisHelper.invalidate('profile', String(req.user.id))
 
 
         logger.info({ userId: req.user.id, username }, 'delete user success')

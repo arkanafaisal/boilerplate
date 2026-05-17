@@ -1,16 +1,22 @@
+import { Request, Response, CookieOptions } from 'express';
 import { randomUUID, createHash, randomBytes } from 'crypto'
-import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken';
-import asyncHandler from 'express-async-handler';
-import { Response, CookieOptions } from 'express';
 
-import { auth as UserModel } from '../models/user.model.js'
+import { isDev, jwtSecret } from '../configs/env.config.js';
+
+import { typedHandler } from '../utils/handler.util.js';
+
+import { authModel } from '../models/user.model.js'
 import * as redisHelper from '../helpers/redis.helper.js'
 
-import { sendMail } from '../utils/mailer.util.js';
+import { authSchema } from '../schemas/user.schema.js';
 
+import { sendMail } from '../utils/mailer.util.js';
 import { logger } from '../libs/logger.lib.js';
-import { isDev, jwtSecret } from '../configs/env.config.js';
+
+import { hashPassword } from '../utils/crypto.util.js';
+
+
 
 
 const refreshTokenOption: CookieOptions = {
@@ -23,18 +29,16 @@ const refreshTokenOption: CookieOptions = {
 
 
 export const authController = {
-    register: asyncHandler(async (req, res) => {
+    register: typedHandler<typeof authSchema.register>(async (req, res) => {
         const { username, password } = req.validated.body
 
-        const hashed = await bcrypt.hash(password, 10)
-        const insertId = await UserModel.insert({ username, password: hashed })
+        const hashed = await hashPassword(password)
+        const insertId = await authModel.insert({ username, password: hashed })
 
         const ok = await issueRefreshToken({ id: insertId, res })
-        if (!ok) {
-            res.sendStatus(500)
-            return
-        }
-        const accessToken = jwt.sign({ id: insertId }, jwtSecret, { expiresIn: "10m" })
+        if (!ok) { res.sendStatus(500); return }
+        
+        const accessToken = "Bearer " + jwt.sign({ sub: String(insertId) }, jwtSecret, { expiresIn: "10m" })
 
         logger.info({ userId: insertId, ip: req.ip }, 'user registered')
         res.status(201).json({ accessToken })
@@ -43,21 +47,16 @@ export const authController = {
 
 
 
-    login: asyncHandler(async (req, res) => {
+    login: typedHandler<typeof authSchema.login>(async (req, res) => {
         const { identifier, password } = req.validated.body
 
-        const id = await UserModel.authenticate({ identifier, password })
-        if (!id) {
-            res.status(400).json({ error: "wrong username, email or password" })
-            return
-        }
+        const id = await authModel.authenticate({ identifier, password })
+        if (!id) { res.status(400).json({ error: "wrong username, email or password" }); return }
 
         const ok = await issueRefreshToken({ id, res })
-        if (!ok) {
-            res.sendStatus(500)
-            return
-        }
-        const accessToken = jwt.sign({ id }, jwtSecret, { expiresIn: '10m' })
+        if (!ok) { res.sendStatus(500); return }
+        
+        const accessToken = "Bearer " + jwt.sign({ sub: String(id) }, jwtSecret, { expiresIn: '10m' })
 
         logger.info({ userId: id, ip: req.ip }, 'login success')
         res.status(200).json({ accessToken })
@@ -66,7 +65,7 @@ export const authController = {
 
 
 
-    logout: asyncHandler(async (req, res) => {
+    logout: typedHandler<{}>(async (req, res) => {
         const refreshToken = req.cookies.refreshToken
 
         if (!refreshToken) {
@@ -85,7 +84,7 @@ export const authController = {
 
 
 
-    refresh: asyncHandler(async (req, res) => {
+    refresh: typedHandler<{}>(async (req, res) => {
         const refreshToken = req.cookies.refreshToken
         if (!refreshToken) {
             logger.debug('refresh token missing')
@@ -93,14 +92,15 @@ export const authController = {
             return
         }
 
-        const { ok, data: payload } = await redisHelper.get('tokens', refreshToken)
-        if (!ok || !payload) {
-            logger.warn('refresh token invalid')
+        const tokenPayload = await redisHelper.get('tokens', refreshToken)
+        if (!tokenPayload.ok) {
+            logger.debug('refresh token invalid')
             res.sendStatus(401)
             return
         }
+        const id = tokenPayload.data.id
 
-        const isExist = await UserModel.validateId({ id: payload.id })
+        const isExist = await authModel.validateId({ id })
         if (!isExist) {
             await redisHelper.del('tokens', refreshToken).catch(() => { })
             res.clearCookie("refreshToken", refreshTokenOption)
@@ -110,45 +110,34 @@ export const authController = {
             return
         }
 
-        const accessToken = jwt.sign({ id: payload.id }, jwtSecret, { expiresIn: '10m' })
+        const accessToken = "Bearer " + jwt.sign({ sub: String(id) }, jwtSecret, { expiresIn: '10m' })
 
-        logger.debug({ userId: payload.id }, 'access token created')
+        logger.debug({ userId: id }, 'access token created')
         res.status(200).json({ accessToken })
         return
     }),
 
 
 
-    verifyEmail: asyncHandler(async (req, res) => {
+    verifyEmail: typedHandler<typeof authSchema.verifyEmail>(async (req, res) => {
         const { token } = req.validated.params
 
         const tokenHash = createHash('sha256').update(token).digest('hex')
 
-        const { ok: ok2, data: payload } = await redisHelper.get('verify_email', tokenHash)
-        if (!ok2 || !payload) {
+        const tokenPayload = await redisHelper.get('verify_email', tokenHash)
+        if (!tokenPayload.ok) {
             logger.debug('verify email token invalid')
             res.sendStatus(400)
             return
         }
 
-        const { affectedRows, changedRows } = await UserModel.updateEmail(payload)
+        const success = await authModel.updateEmail(tokenPayload.data)
         await redisHelper.del('verify_email', tokenHash)
-        if (affectedRows === 0) {
-            await redisHelper.invalidate('profile', payload.id)
+        if(!success){res.sendStatus(404); return}
 
-            logger.warn('verify email token user not found')
-            res.sendStatus(400)
-            return
-        }
-        if (changedRows === 0) {
-            logger.info(payload, 'verify email success but email not changed')
-            res.sendStatus(200)
-            return
-        }
+        await redisHelper.invalidate('profile', String(tokenPayload.data.id))
 
-        await redisHelper.invalidate('profile', payload.id)
-
-        logger.info(payload, 'verify email success')
+        logger.info(tokenPayload.data, 'verify email success')
         res.sendStatus(200)
         return
     }),
@@ -156,10 +145,10 @@ export const authController = {
 
 
 
-    forgotPassword: asyncHandler(async (req, res) => {
+    forgotPassword: typedHandler<typeof authSchema.forgotPassword>(async (req, res) => {
         const { email } = req.validated.body
 
-        const id = await UserModel.getIdByEmail({ email })
+        const id = await authModel.getIdByEmail({ email })
         if (!id) {
             logger.debug({ email }, 'forgot password email not found')
             res.sendStatus(200)
@@ -185,40 +174,32 @@ export const authController = {
 
 
 
-    resetPassword: asyncHandler(async (req, res) => {
+    resetPassword: typedHandler<typeof authSchema.resetPassword>(async (req, res) => {
         const { token } = req.validated.params
         const { password } = req.validated.body
 
         const tokenHash = createHash('sha256').update(token).digest('hex')
 
-        const { ok: ok2, data: payload } = await redisHelper.get('reset_password', tokenHash)
-        if (!ok2 || !payload) {
+        const tokenPayload = await redisHelper.get('reset_password', tokenHash)
+        if (!tokenPayload.ok) {
             logger.debug('reset password token invalid')
             res.status(400).json({ error: "token invalid" })
             return
         }
+        const id = tokenPayload.data.id
 
-        const hashed = await bcrypt.hash(password, 10)
-        const affectedRows = await UserModel.updatePassword({ password: hashed, id: payload.id })
+        const success = await authModel.updatePassword({ password, id })
         await redisHelper.del('reset_password', tokenHash)
-        if (affectedRows === 0) {
-            logger.warn('reset password user not found')
-            res.sendStatus(400)
-            return
-        }
+        if(!success){res.sendStatus(404); return}
 
-        logger.info({ id: payload.id }, 'reset password success')
+        logger.info({ id }, 'reset password success')
         res.sendStatus(200)
         return
     })
 }
 
-interface IssueRefreshTokenParams {
-    id: number;
-    res: Response;
-}
 
-async function issueRefreshToken({ id, res }: IssueRefreshTokenParams): Promise<boolean> {
+async function issueRefreshToken({ id, res }: { id: number, res: Response }): Promise<boolean> {
     const refreshToken = randomUUID()
 
     const { ok: ok2 } = await redisHelper.set('tokens', refreshToken, { id })

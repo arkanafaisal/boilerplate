@@ -10,8 +10,50 @@ const transporter = nodemailer.createTransport({
 
 const root = isDev ? "http://localhost:5173" : `https://${projectName}.arkanafaisal.my.id`;
 
-// Helper function agar desain UI email seragam dan tidak perlu ditulis ulang
-const generateEmailTemplate = (title, message, buttonText, link) => {
+
+type MailParams = { email: string, token: string }
+export const sendMail = {
+  verifyEmail: async ({ email, token }: MailParams) => {
+    const link = `${root}/auth/verify-email/${token}`;
+    
+    await transporter.sendMail({
+      from: `"${projectName}" <no-reply@arkanafaisal.my.id>`,
+      to: email,
+      subject: `Verify your email for ${projectName}`,
+      text: `Welcome to ${projectName}!\n\nPlease verify your email address by clicking the link below:\n${link}\n\nIf you did not request this, please ignore this email.`,
+      html: generateEmailTemplate(
+        'Verify your email address',
+        'Thank you for signing up! To complete your registration and secure your account, please verify your email address by clicking the button below.',
+        'Verify Email',
+        link
+      )
+    });
+  },
+  
+  resetPassword: async ({ email, token }: MailParams) => {
+    const link = `${root}/auth/reset-password/${token}`;
+    
+    await transporter.sendMail({
+      from: `"${projectName}" <no-reply@arkanafaisal.my.id>`,
+      to: email,
+      subject: `Reset your ${projectName} password`,
+      text: `We received a request to reset your password.\n\nYou can reset it by clicking the link below:\n${link}\n\nIf you did not request a password reset, please ignore this email.`,
+      html: generateEmailTemplate(
+        'Password Reset Request',
+        'We received a request to reset the password for your account. If you made this request, click the button below to choose a new password.',
+        'Reset Password',
+        link
+      )
+    });
+  }
+};
+
+
+
+
+
+
+const generateEmailTemplate = (title: string, message: string, buttonText: string, link: string) => {
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 20px; color: #18181b; background-color: #ffffff;">
       
@@ -52,41 +94,4 @@ const generateEmailTemplate = (title, message, buttonText, link) => {
       </p>
     </div>
   `;
-};
-
-export const sendMail = {
-  verifyEmail: async ({ email, token }) => {
-    const link = `${root}/auth/verify-email/${token}`;
-    
-    await transporter.sendMail({
-      from: `"${projectName}" <no-reply@arkanafaisal.my.id>`,
-      to: email,
-      subject: `Verify your email for ${projectName}`,
-      // Text murni untuk fallback klien email jadul / notifikasi HP
-      text: `Welcome to ${projectName}!\n\nPlease verify your email address by clicking the link below:\n${link}\n\nIf you did not request this, please ignore this email.`,
-      html: generateEmailTemplate(
-        'Verify your email address',
-        'Thank you for signing up! To complete your registration and secure your account, please verify your email address by clicking the button below.',
-        'Verify Email',
-        link
-      )
-    });
-  },
-  
-  resetPassword: async ({ email, token }) => {
-    const link = `${root}/auth/reset-password/${token}`; // Disesuaikan dengan routing App.jsx Anda
-    
-    await transporter.sendMail({
-      from: `"${projectName}" <no-reply@arkanafaisal.my.id>`,
-      to: email,
-      subject: `Reset your ${projectName} password`,
-      text: `We received a request to reset your password.\n\nYou can reset it by clicking the link below:\n${link}\n\nIf you did not request a password reset, please ignore this email.`,
-      html: generateEmailTemplate(
-        'Password Reset Request',
-        'We received a request to reset the password for your account. If you made this request, click the button below to choose a new password.',
-        'Reset Password',
-        link
-      )
-    });
-  }
 };

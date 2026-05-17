@@ -8,24 +8,7 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
-    command: npm run dev -- --legacy-watch
     env_file:
       - .env
     ports:
       - "3000:3000"
-
-  flyway:
-    build:
-      context: .
-      target: flyway
-    environment:
-      MYSQL_HOST: ${MYSQL_HOST}
-      MYSQL_DB: ${MYSQL_DB}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    command: >
-      -validateMigrationNaming=true
-      -url=jdbc:mysql://${MYSQL_HOST}:3306/${MYSQL_DB}
-      -user=${MYSQL_USER}
-      -password=${MYSQL_PASSWORD}
-      migrate 

@@ -9,25 +9,36 @@ const redisType = {
     "reset_password": {level: 2, prefix: ':reset_password:', ttl: 60 * 15},
 
     'profile': {level: 3, prefix: ':cache:profile:', ttl: 60 * 30},
-}
+} as const
+type RedisType = keyof typeof redisType
+
+type RedisPayloadType = {
+    'tokens': {id: number},
+    'verify_email': {id: number, email: string},
+    'reset_password': {id: number},
+
+    'profile': any
+} 
 
 
-function getKey(type, key){
-    const prefix = base + redisType[type]?.prefix
+function getKey(type: RedisType, key: string){
+    const prefix = base + redisType[type].prefix
 
     if(!prefix){throw new Error('redis type invalid')}
 
     return prefix + key
 }
 
-export async function get(type, key){
+export async function get<K extends RedisType>(type: K, key: string): Promise< {ok: false} | {ok: true, data: RedisPayloadType[K]}>{
     const level = redisType[type].level
     try {
         const rawData = await redis.get(getKey(type, key))
         if(!rawData){return {ok: false}}
         
         if(level >= 3){logger.trace({ key: getKey(type, key) }, 'redis cache used')}
-        return {ok: true, data: JSON.parse(rawData)}
+        const data = Buffer.isBuffer(rawData) ? rawData.toString('utf-8') : rawData
+        return {ok: true, data: JSON.parse(data)}
+
     } catch(err) {
         if(level >= 3){
             logger.debug({ err }, "redis GET cache failed")
@@ -40,7 +51,7 @@ export async function get(type, key){
     }
 }
 
-export async function set(type, key, data){
+export async function set<K extends RedisType>(type: K, key: string, data: RedisPayloadType[K]){
     try {
         await redis.set(getKey(type, key), JSON.stringify(data), {"EX": redisType[type].ttl})
         return {ok: true} 
@@ -56,7 +67,7 @@ export async function set(type, key, data){
     }
 }
 
-export async function del(type, key){
+export async function del(type: RedisType, key: string){
     try {
         await redis.del(getKey(type, key))
     } catch (err) {
@@ -72,14 +83,15 @@ export async function del(type, key){
     }
 }
 
-export async function delPattern(type, key) {
+export async function delPattern(type: RedisType, key: string) {
     const pattern = getKey(type, key) + '*'
     let cursor = '0'
     try {
         do {
             const { keys, cursor: nextCursor } = await redis.scan(cursor, { MATCH: pattern, COUNT: 50 })
-            cursor = nextCursor
-    
+
+            cursor = Buffer.isBuffer(nextCursor) ? nextCursor.toString('utf-8') : nextCursor
+            
             if (keys.length) {
                 await redis.del(keys)
             }
@@ -91,13 +103,14 @@ export async function delPattern(type, key) {
 
 
 
-export async function invalidate(type, key) {
+export async function invalidate(type: RedisType, key: string) {
     const level = redisType[type].level
-    if(level === 4){
-        await delPattern(type, key)
-        retry(()=>delPattern(type, key), 1, 500).catch(()=>{})
+    // if(level === 4){
+    //     await delPattern(type, key)
+    //     retry(()=>delPattern(type, key), 1, 500).catch(()=>{})
         
-    } else if(level === 3){
+    // } else 
+    if(level === 3){
         await del(type, key)
         retry(()=>del(type, key), 1, 500).catch(()=>{})
 
@@ -123,11 +136,11 @@ export async function invalidate(type, key) {
 
 
 
-function sleep(ms) {
+function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms))
 }
 
-async function retry(fn, count, delay = 100) {
+async function retry(fn: Function, count: number, delay = 100) {
     let attempt = 1
         
     while (attempt <= count) {

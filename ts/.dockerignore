@@ -5,3 +5,7 @@
 **/build
 **/.git
 **/*.log
+
+repomix-output.md
+project-context.json
+README.md

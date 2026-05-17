@@ -1,64 +1,136 @@
-import db from "../libs/db.lib.js"
-import bcrypt from 'bcrypt'
+import { prisma } from '../libs/prisma.lib.js'
+import { comparePassword, hashPassword } from '../utils/crypto.util.js'
 
-export const auth = {
-    insert: async ({ username, password }) => {
-        const [{insertId}] = await db.query('INSERT INTO users (username, password) VALUES (?, ?)', [username, password])
-        if(!insertId){throw new Error('ER_NO_INSERT_ID')}
-        
-        return insertId
-    },
-    authenticate: async ({ identifier, password }) => {
-        const [[user]] = await db.query('SELECT id, username, password FROM users WHERE (username = ? OR email = ?)', [identifier, identifier])
-        if(!user){return null}
+export const authModel = {
+    insert: async ({ username, password }: { username: string, password: string }) => {
+        const user = await prisma.user.create({
+            data: {
+                username,
+                password
+            }
+        })
 
-        const ok = await bcrypt.compare(password, user.password)
-        if(!ok){return null}
         return user.id
     },
-    validateId: async ({ id }) => {
-        const [[row]] = await db.query('SELECT 1 FROM users WHERE id = ?', [id])
-        return !!row
+    authenticate: async ({ identifier, password }: { identifier: string, password: string }) => {
+        const user = await prisma.user.findFirst({
+            where: { OR: [{ username: identifier }, { email: identifier }]},
+            select: { id: true, password: true }
+        })
+        if(!user){return null}
+
+        const isMatch = await comparePassword(password, user.password)
+        return isMatch? user.id : null
     },
-    updateEmail: async ({ email, id }) => {
-        const [{affectedRows, changedRows}] = await db.query("UPDATE users SET email = ? WHERE id = ?", [email, id])
-        return {affectedRows, changedRows}
+    validateId: async ({ id }: { id: number }) => {
+        const user = await prisma.user.findUnique({
+            where: { id },
+            select: { id: true }
+        })
+        return user !== null
     },
-    getIdByEmail: async ({ email }) => {
-        const [[user]] = await db.query("SELECT id FROM users WHERE email = ?", [email])
-        return user?.id
+    updateEmail: async ({ email, id }: { email: string, id: number }) => {
+        const user = await safePrisma(
+            prisma.user.update({
+                where: { id },
+                data: { email },
+                select: { email: true }
+        }))
+
+        return !!user
     },
-    updatePassword: async ({ id, password }) => {
-        const [{affectedRows}] = await db.query("UPDATE users SET password = ? WHERE id = ?", [password, id])
-        return affectedRows
+    getIdByEmail: async ({ email }: { email: string }) => {
+        const user = await prisma.user.findUnique({
+            where: { email },
+            select: { id: true }
+        })
+
+        return user? user.id : null
+    },
+    updatePassword: async ({ id, password }: { id: number, password: string }) => {
+        const hashed = await hashPassword(password)
+
+        const user = await safePrisma(
+            prisma.user.update({
+                where: { id },
+                data: { password: hashed },
+                select: { id: true }
+        }))
+
+        return !!user
     }
 }
 
-export const user = {
-    getById: async ({ id }) => {
-        const [[user]] = await db.query('SELECT username, email FROM users WHERE id = ?', [id])
+export const userModel = {
+    getById: async ({ id }: { id: number }) => {
+        const user = await prisma.user.findUnique({
+            where: { id },
+            select: { username: true, email: true }
+        })
+        
         return user
     },
-    validateEmail: async ({ email }) => {
-        const [[row]] = await db.query("SELECT 1 FROM users WHERE email = ?", [email])
-        return !!row
+    validateEmail: async ({ email }: { email: string }) => {
+        const user = await prisma.user.findUnique({
+            where: { email },
+            select: { id: true }
+        })
+        
+        return user !== null
     },
-    updateUsername: async ({ id, username }) => {
-        const [{affectedRows, changedRows}] = await db.query('UPDATE users SET username = ? WHERE id = ?', [username, id])
-        return {affectedRows, changedRows}
+    updateUsername: async ({ id, username }: { id: number, username: string }) => {
+        const user = await safePrisma(
+            prisma.user.update({
+                where: { id },
+                data: { username },
+                select: { id: true }
+        }))
+
+        return !!user
     },
-    getPasswordById: async ({ id }) => {
-        const [[user]] = await db.query('SELECT password FROM users WHERE id = ?', [id])
-        return user 
+    getPasswordById: async ({ id }: { id: number }) => { 
+        const user = await prisma.user.findUnique({
+            where: { id },
+            select: { password: true }
+        })
+        
+        return user? user.password : null
     },
-    updatePassword: async ({ id, password }) => {
-        const [{affectedRows}] = await db.query("UPDATE users SET password = ? WHERE id = ?", [password, id])
-        return affectedRows
+    updatePassword: async ({ id, password }: { id: number, password: string }) => {
+        const hashed = await hashPassword(password)
+
+        const user = await safePrisma(
+            prisma.user.update({
+                where: { id },
+                data: { password: hashed },
+                select: { id: true }
+        }))
+
+        return !!user
     },
-    del: async ({ id, username }) => {
-        const [{ affectedRows }] = await db.query('DELETE FROM users WHERE id = ? AND username = ?', [id, username])
-        return affectedRows
+    del: async ({ id, username }: { id: number, username: string }) => {
+        const user = await safePrisma(
+            prisma.user.delete({
+                where: { id, username },
+                select: { id: true }
+        }))
+
+        return !!user
     },
     
 }
 
+
+
+import { Prisma } from '@prisma/client'
+
+const safePrisma = async <T>(prismaPromise: Promise<T>): Promise<T | null> => {
+    try {
+        return await prismaPromise;
+    } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+            return null;
+        }
+        throw err;
+    }
+};

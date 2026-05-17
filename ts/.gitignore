@@ -2,8 +2,12 @@
 **/.env
 
 **/dist/
-
+.env.migrate
 
 
 local-note.md
-repomix-output.xml
+
+project-context.json
+
+**/repomix-output.xml
+**/.repomixignore

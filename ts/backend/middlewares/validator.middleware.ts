@@ -1,19 +1,19 @@
-import { RequestHandler } from 'express'
+import { Request, RequestHandler } from 'express'
 import { ZodTypeAny } from 'zod'
-import { auth, user } from '../schemas/user.schema.js'
+import { authSchema, userSchema } from '../schemas/user.schema.js'
 import { validateHelper } from '../utils/zod-formatter.util.js'
 
 const schemas: Record<string, Record<string, ZodTypeAny>> = {
-    register: auth.register,
-    login: auth.login,
-    verifyEmail: auth.verifyEmail,
-    forgotPassword: auth.forgotPassword,
-    resetPassword: auth.resetPassword,
+    register: authSchema.register,
+    login: authSchema.login,
+    verifyEmail: authSchema.verifyEmail,
+    forgotPassword: authSchema.forgotPassword,
+    resetPassword: authSchema.resetPassword,
 
-    updateUsername: user.updateUsername,
-    updatePassword: user.updatePassword,
-    sendEmailVerification: user.sendEmailVerification,
-    deleteUser: user.delete,
+    updateUsername: userSchema.updateUsername,
+    updatePassword: userSchema.updatePassword,
+    sendEmailVerification: userSchema.sendEmailVerification,
+    deleteUser: userSchema.delete,
 }
 
 const fields = ['body', 'query', 'params'] as const
@@ -31,12 +31,22 @@ function validateSchemas() {
 
 validateSchemas()
 
+interface ValidatedRequest extends Request {
+    validated: {
+        body?: any;
+        query?: any;
+        params?: any;
+    }
+}
+
 export function validate(schemaType: keyof typeof schemas): RequestHandler {
     return (req, res, next) => {
         if (!Object.hasOwn(schemas, schemaType)) { throw new Error('invalid schema type') }
         const schema = schemas[schemaType]
 
-        req.validated = {}
+        const mutableReq = req as ValidatedRequest
+        mutableReq.validated = {} 
+
         for (const field of fields) {
             if (!schema[field]) { continue }
 
@@ -45,7 +55,7 @@ export function validate(schemaType: keyof typeof schemas): RequestHandler {
                 res.status(400).json({ error: message })
                 return
             }
-            req.validated[field] = value
+            mutableReq.validated[field] = value
         }
 
         next()

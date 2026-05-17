@@ -5,7 +5,7 @@ import { isDev, logLevel } from '../configs/env.config.js'
 export const logger = pino({
   level: logLevel || 'info',
   base: isDev
-    ? null      // remove pid, hostname
+    ? null
     : undefined,
   transport: isDev
     ? {
