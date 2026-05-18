@@ -1,9 +1,9 @@
 // src/utils/fetcher.js
 import { navigate } from './navigation';
 
-let inMemoryAccessToken = null;
+let inMemoryAccessToken: string | null;
 
-export const setAccessToken = (token) => {
+export const setAccessToken = (token: string | null) => {
     inMemoryAccessToken = token;
 };
 
@@ -14,10 +14,10 @@ export const getAccessToken = () => {
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
-export async function fetcher(endpoint, options = {}, requireAuth = true) {
-  let token = getAccessToken;
+export async function fetcher(endpoint: string, options: any, requireAuth = true): Promise<Response> {
+  let token = getAccessToken();
   const url = `${BASE_URL}${endpoint}`;
-  
+  console.log(url)
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -47,12 +47,12 @@ export async function fetcher(endpoint, options = {}, requireAuth = true) {
 
       if (refreshRes.ok) {
         const refreshResult = await refreshRes.json().catch(() => null);
-        const newToken = refreshResult?.accessToken || (typeof refreshResult === 'string' ? refreshResult : null);
+        const newToken = refreshResult.accessToken
 
         if (newToken) {
           token = newToken;
-          setAccessToken(token)
-          headers['Authorization'] = getAccessToken;
+          setAccessToken(newToken)
+          headers['Authorization'] = getAccessToken();
           
           response = await fetch(url, { ...options, headers, body });
           return response;
@@ -76,7 +76,16 @@ export async function fetcher(endpoint, options = {}, requireAuth = true) {
 
   } catch (error) {
     console.error("Network Error:", error);
-  
-    return { ok: false, status: 0, json: async () => ({}) };
+    
+    const mockResponse = { 
+      ok: false, 
+      status: 0, 
+      clone: () => ({
+        json: async () => ({})
+      }),
+      json: async () => ({}) 
+    };
+
+    return mockResponse as unknown as Response
   }
 }

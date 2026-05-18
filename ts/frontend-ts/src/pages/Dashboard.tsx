@@ -5,7 +5,7 @@ import { navigate } from '../utils/navigation';
 import { setAccessToken } from '../utils/fetcher';
 
 export default function Dashboard() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<{username: string, email: string | null} | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   const [newEmail, setNewEmail] = useState('');
@@ -32,7 +32,7 @@ export default function Dashboard() {
     navigate('/');
   };
 
-  const handleUpdateEmail = async (e) => {
+  const handleUpdateEmail = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsUpdating(true);
     setUpdateMessage('');
@@ -81,7 +81,7 @@ export default function Dashboard() {
           <div className="flex flex-col gap-3 text-sm">
             <div className="flex justify-between">
               <span>Username</span>
-              <span className="font-bold">{user.username || user.displayName}</span>
+              <span className="font-bold">{user.username}</span>
             </div>
             <div className="flex justify-between">
               <span>Email</span>

@@ -4,9 +4,12 @@ import api from '../utils/api';
 import { navigate } from '../utils/navigation';
 import { setAccessToken } from '../utils/fetcher';
 
+export type AuthModalType = 'login' | 'register' | 'forgot-password';
+export interface AuthModalState { isOpen: boolean, type: AuthModalType }
+
 export function useLanding() {
-  const [authModal, setAuthModal] = useState({ isOpen: false, type: 'login' });
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [authModal, setAuthModal] = useState<AuthModalState>({ isOpen: false, type: 'login' });
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -24,7 +27,11 @@ export function useLanding() {
           setAccessToken(null)
         }
       } catch (error) {
+        console.error("Auth check failed to execute:", error);
         
+        if (isMounted) {
+           setAccessToken(null);
+        }
       } finally {
         if (isMounted) {
           setIsCheckingAuth(false);
@@ -39,14 +46,9 @@ export function useLanding() {
     };
   }, []);
 
-  const openAuthModal = (type) => {
-    setAuthModal({ isOpen: true, type });
-  };
-
   return {
     authModal,
     setAuthModal,
     isCheckingAuth,
-    openAuthModal
   };
 }
