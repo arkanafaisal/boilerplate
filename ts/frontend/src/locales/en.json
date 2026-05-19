@@ -4,7 +4,28 @@
     "signup": "Sign Up"
   },
   "hero": {
-    
+    "badge": "Stop waiting for WhatsApp Web to load.",
+    "titleMain": "Transfer text & links to any device, ",
+    "titleHighlight": "Instantly.",
+    "descPart1": "Save presentation links, code snippets, or long texts. Access them privately on your own devices, or open public access with a ",
+    "descCode": "publicKey",
+    "descPart2": " for shared computers.",
+    "searchPlaceholder": "Search username...",
+    "btn": "Public Access"
+  },
+  "feature": {
+    "private": {
+      "title": "Private Access",
+      "desc": "Encrypted data accessible only by you. Login on any device to copy your data instantly without messy chat histories.",
+      "btn": "Go to Private Dashboard"
+    },
+    "public": {
+      "title": "Public Access",
+      "descPart1": "Perfect for campus PCs or cybercafes. Open access to specific data using a ",
+      "descCode": "publicKey",
+      "descPart2": ".",
+      "btn": "Try Public Simulation"
+    }
   },
   "auth": {
     "loginTitle": "Welcome back",
@@ -56,6 +77,6 @@
     "errConnection": "Connection failed. Please check your internet."
   },
   "footer": {
-  
+    "builtBy": "Built by"
   }
 }

@@ -1,6 +1,8 @@
 import { prisma } from '../libs/prisma.lib.js'
 import { comparePassword, hashPassword } from '../utils/crypto.util.js'
 
+// import { migratePasswordVersion } from '../scripts/migrate-password-version.js'
+
 export const authModel = {
     insert: async ({ username, password }: { username: string, password: string }) => {
         const user = await prisma.user.create({
@@ -20,6 +22,7 @@ export const authModel = {
         if(!user){return null}
 
         const isMatch = await comparePassword(password, user.password)
+        // if(isMatch){void migratePasswordVersion({ id: user.id, stored: user.password, plain: password })}
         return isMatch? user.id : null
     },
     validateId: async ({ id }: { id: number }) => {
