@@ -3,7 +3,7 @@
 ## Tech Stack & Architecture
 
 ### 1. Backend Architecture & Key Features
-- **Tech Stack**: Node.js (TypeScript), Express.js, Prisma ORM (PostgreSQL), Redis, Zod (Validation).
+- **Tech Stack**: Node.js (TypeScript), Express.js, Prisma ORM (PostgreSQL), Redis, Zod (Validation), Pino (Structured Logging).
 - **Session & Cookie Management**:
   - Uses a combination of a **Refresh Token** (stored in Redis and sent as an `http-only`, `secure`, `sameSite` Cookie).
   - Uses a short-lived **Access Token (JWT)** (10 minutes) sent to the Frontend and embedded in the `Authorization: Bearer <token>` header.
