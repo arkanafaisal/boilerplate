@@ -3,22 +3,22 @@
 ## Tech Stack & Architecture
 
 ### 1. Backend Architecture & Key Features
-- **Tech Stack**: Node.js (TypeScript), Express.js, Prisma ORM (PostgreSQL), Redis, Zod (Validasi).
+- **Tech Stack**: Node.js (TypeScript), Express.js, Prisma ORM (PostgreSQL), Redis, Zod (Validation).
 - **Session & Cookie Management**:
-  - Menggunakan kombinasi **Refresh Token** (disimpan di Redis dan dikirim sebagai `http-only`, `secure`, `sameSite` Cookie).
-  - Menggunakan **Access Token (JWT)** berumur pendek (10 menit) yang dikirim ke Frontend dan disisipkan pada header `Authorization: Bearer <token>`.
-- **Rate Limiting**: Custom middleware berbasis Redis (`rl`) yang membatasi *request* spesifik per endpoint. Memiliki mekanisme penalti pemotongan kuota *hit* yang lebih besar khusus untuk *request* yang berhasil (status 200-299)
-- **Global Routing & Error Handling**: Seluruh API berjalan di *base path* `/api/`. Error ditangkap secara global melalui *centralized error handler* (`error-handler.middleware.ts`). Secara umum, backend ini hanya mengembalikan **HTTP Status Code** saja (misal `200 OK` tanpa body), **kecuali** pada error `400 Bad Request` yang mengembalikan pesan spesifik (contoh: `{ "error": "wrong password" }`).
+  - Uses a combination of a **Refresh Token** (stored in Redis and sent as an `http-only`, `secure`, `sameSite` Cookie).
+  - Uses a short-lived **Access Token (JWT)** (10 minutes) sent to the Frontend and embedded in the `Authorization: Bearer <token>` header.
+- **Rate Limiting**: Custom Redis-based middleware (`rl`) that limits specific requests per endpoint. It features a penalty mechanism that consumes more hit quota specifically for successful requests (status 200-299) to prevent spamming successful actions.
+- **Global Routing & Error Handling**: All APIs run under the `/api/` base path. Errors are caught globally via a *centralized error handler* (`error-handler.middleware.ts`). Generally, this backend only returns an **HTTP Status Code** (e.g., `200 OK` without a body), **except** for `400 Bad Request` errors which return a specific message payload (e.g., `{ "error": "wrong password" }`).
 
 ### 2. Frontend Architecture & Key Features
-- **Tech Stack**: React 19 (TS), Vite, Tailwind CSS v4, Lucide React, i18next (Lokalisasi).
-- **Routing**: Menggunakan Vanilla Routing (API bawaan browser) melalui penangkapan event `popstate` dan `window.location.pathname` yang dikelola secara global di `App.tsx`. Tidak menggunakan library eksternal seperti React Router.
-- **State Management**: Menggunakan *Custom Hooks* (`useAuth.ts`, `useLanding.ts`, dll) serta pola *Prop Drilling* untuk komponen hierarki pendek. Tidak menggunakan *global state manager* seperti Redux atau Zustand.
-- **Theming**: Dark Mode/Light Mode di-manage di tingkat global root (`App.tsx`) menggunakan deteksi `localStorage` dan preferensi sistem browser.
+- **Tech Stack**: React 19 (TS), Vite, Tailwind CSS v4, Lucide React, i18next (Localization).
+- **Routing**: Uses Vanilla Routing (Native browser API) by capturing `popstate` events and `window.location.pathname` managed globally in `App.tsx`. Does not use external libraries like React Router.
+- **State Management**: Uses *Custom Hooks* (`useAuth.ts`, `useLanding.ts`, etc.) and the *Prop Drilling* pattern for short component hierarchies. Does not use a *global state manager* like Redux or Zustand.
+- **Theming**: Dark Mode/Light Mode is managed at the global root level (`App.tsx`) using `localStorage` detection and browser system preferences.
 
 ## Backend API List
 
-*Catatan: Seluruh API Auth berjalan di bawah `/api/auth` dan User di bawah `/api/users`. Detail validasi input dilakukan via Zod schema, dan respons error dikelola secara global. Dokumentasi ini hanya memuat skenario Success.*
+*Note: All Auth APIs run under `/api/auth` and User APIs under `/api/users`. Input validation details are handled via Zod schemas, and error responses are managed globally. This documentation only lists Success scenarios.*
 
 ### Auth Module (`/api/auth`)
 1. **`POST /register`**
@@ -36,73 +36,73 @@
 5. **`POST /verify-email/:token`**
    - **Input**: `token` (URL Param)
 6. **`POST /forgot-password`**
-   - **Aksi**: Mengirimkan email berisi tautan *reset password*.
+   - **Action**: Sends an email containing a *reset password* link.
    - **Input**: `email`
 7. **`POST /reset-password/:token`**
    - **Input**: `token` (URL Param), `password` (Body)
 
 ### User Profile Module (`/api/users`)
-*Catatan: Seluruh endpoint ini mensyaratkan `accessToken` Header (Bearer).*
+*Note: All endpoints here require the `accessToken` Header (Bearer).*
 
 1. **`GET /me`**
-   - **Response**: Returns Profile Object (`id`, `username`, `email`, dll)
+   - **Response**: Returns Profile Object (`id`, `username`, `email`, etc.)
 2. **`PATCH /me/username`**
    - **Input**: `username`
 3. **`PATCH /me/email`**
-   - **Aksi**: Mengajukan ganti email dan otomatis mengirim email verifikasi ke alamat baru.
+   - **Action**: Requests an email change and automatically sends a verification email to the new address.
    - **Input**: `email`
 4. **`PATCH /me/password`**
-   - **Aksi**: Mengubah *password* setelah memvalidasi *password* lama.
+   - **Action**: Changes the *password* after validating the old *password*.
    - **Input**: `oldPassword`, `newPassword`
 5. **`DELETE /me`**
-   - **Aksi**: Menghapus akun secara permanen beserta data relasinya.
-   - **Input**: `username` (sebagai konfirmasi)
+   - **Action**: Permanently deletes the account and its relational data.
+   - **Input**: `username` (as confirmation)
 
 ## Frontend Component Breakdown
 
-*Komponen dipetakan berdasarkan Feature Domains, lengkap dengan fungsionalitas dan aliran datanya.*
+*Components are mapped by Feature Domains, complete with their functionalities and data flow.*
 
 ### 1. Landing & Public (`LandingPage.tsx`, `Navbar.tsx`)
-- **Features**: Toggle Light/Dark mode, memicu Auth Modal, dan menampilkan Hero Section.
-- **Data Displayed**: Nama *Project*, status *loading* ketika memeriksa autentikasi.
+- **Features**: Toggles Light/Dark mode, triggers the Auth Modal, and displays the Hero Section.
+- **Data Displayed**: *Project* Name, *loading* status when checking authentication.
 
 ### 2. Authentication (`AuthModal.tsx`)
-- **Features**: Autentikasi user, pendaftaran akun baru, pengiriman email *reset password*, dan navigasi antar form (switch form).
-- **Data Displayed**: Pesan sukses/error (feedback) setelah *submit*.
+- **Features**: User authentication, new account registration, *reset password* email request, and navigation between forms (switching forms).
+- **Data Displayed**: Success/error messages (feedback) after *submit*.
 - **Data Inputs**:
   - **Login**: `Identifier` (username/email), `Password`.
   - **Register**: `Identifier/Username`, `Password`, `Confirm Password`.
   - **Forgot Password**: `Email`.
 
 ### 3. Dashboard (`Dashboard.tsx`)
-- **Features**: Melihat detail profil, memperbarui alamat email, dan Logout.
-- **Data Displayed**: `Username`, `Email` (atau 'Not Set' jika belum ada).
+- **Features**: Views profile details, updates email address, and Logout.
+- **Data Displayed**: `Username`, `Email` (or 'Not Set' if not available).
 - **Data Inputs**:
   - **Update Email**: `newEmail`.
 
 ### 4. Verification & Reset Flow (`VerifyEmail.tsx`, `ResetPassword.tsx`)
-*Halaman khusus yang diakses via tautan yang dikirim ke email.*
+*Special pages accessed via links sent to email.*
 - **Features**:
-  - `VerifyEmail`: Otomatis memvalidasi token URL untuk verifikasi email.
-  - `ResetPassword`: Mengizinkan user untuk memasukkan password baru jika token di URL valid.
-- **Data Displayed**: Indikator *Loading* (Spinner), indikator Sukses/Error (Validasi token gagal/kedaluwarsa).
+  - `VerifyEmail`: Automatically validates the URL token for email verification.
+  - `ResetPassword`: Allows the user to enter a new password if the URL token is valid.
+- **Data Displayed**: *Loading* Indicator (Spinner), Success/Error indicator (Token validation failed/expired).
 - **Data Inputs**:
-  - **Verify Email**: Tidak ada input manual (Token dari URL).
+  - **Verify Email**: No manual input (Token from URL).
   - **Reset Password**: `Password`, `Confirm Password`.
 
 ## API Message Mapping Implementation
-Frontend menggunakan `apiMessages.ts` untuk memetakan respons dari backend (yang sebagian besar berupa *HTTP Status Code* tanpa *body*) menjadi pesan *feedback* yang dibaca oleh pengguna.
+The frontend uses `apiMessages.ts` to map responses from the backend (which are mostly *HTTP Status Codes* without a *body*) into user-readable *feedback* messages.
 
 ### 1. Common Error Handler (`handleCommonMessages`)
-Menangani *status code* global yang berlaku untuk semua *request*:
-- `0`: Connection failed (Masalah jaringan).
+Handles global *status codes* applicable to all *requests*:
+- `0`: Connection failed.
 - `>= 500`: Internal server error.
-- `429`: Too many requests (Terkena *Rate Limit*).
+- `429`: Too many requests
 - `403`: Forbidden.
-- `400`: Invalid data/Bad Request (Akan mengekstrak JSON dari *body* untuk mendapatkan detail pesan error, jika gagal menggunakan pesan default).
+- `400`: Invalid data/Bad Request (Will extract JSON from the *body* to get detailed error messages, using a default message if it fails).
 
 ### 2. Endpoint-Specific Mapping
-Pesan khusus yang menangani kode respons dari tiap modul:
+Specific messages handling response codes from each module:
 - **Auth Flow**:
   - `login`: `200` (Success), `401`/`404` (Incorrect credentials).
   - `register`: `200`/`201` (Success), `409` (Username is already taken).
@@ -116,8 +116,7 @@ Pesan khusus yang menangani kode respons dari tiap modul:
 
 ## DevOps & Deployment Architecture
 
-- **Containerization**: Monolitik via *multi-stage* `Dockerfile`. Stage 1 (Node 20) men-*compile* UI Vite, Stage 2 (Node 22) menyalin hasil *build* UI ke folder `public/` Backend Express agar dapat dilayani bersamaan di satu *port*.
-- **Orchestration (`docker-compose.yml`)**: Membaca `.env` untuk menjalankan kontainer aplikasi (dan Caddy opsional). Mengasumsikan PostgreSQL & Redis berjalan langsung di mesin *host* via *binding* `host.docker.internal:host-gateway`.
-- **Database Migration**: Berjalan terpisah secara *one-off* untuk mencegah konflik, dieksekusi via *compose profile*:
-  `docker compose -f docker-compose.dev.yml --profile migrate up` (membaca konfigurasi `.env.migrate`).
-
+- **Containerization**: Monolithic via *multi-stage* `Dockerfile`. Stage 1 (Node 20) compiles the Vite UI, Stage 2 (Node 22) copies the UI *build* results to the Backend Express `public/` folder so it can be served together on a single *port*.
+- **Orchestration (`docker-compose.yml`)**: Reads `.env` to run the application container (and optionally Caddy). Assumes PostgreSQL & Redis are running directly on the *host* machine via the `host.docker.internal:host-gateway` *binding*.
+- **Database Migration**: Runs separately as a *one-off* to prevent conflicts, executed via *compose profile*:
+  `docker compose -f docker-compose.dev.yml --profile migrate up` (reads `.env.migrate` configuration).
